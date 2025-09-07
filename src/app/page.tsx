@@ -1,9 +1,15 @@
+'use client';
+
 import PortList from '@/components/PortList';
 import ThemeToggle from '@/components/ThemeToggle';
 import AutoRefresh from '@/components/AutoRefresh';
+import DemoMode from '@/components/DemoMode';
+import { usePortStore } from '@/store/usePortStore';
 import { Terminal, Zap } from 'lucide-react';
 
 export default function Home() {
+  const { isDemo, setDemoMode } = usePortStore();
+  
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
@@ -32,6 +38,7 @@ export default function Home() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+        <DemoMode isDemo={isDemo} onToggleDemo={setDemoMode} />
         <AutoRefresh />
         <PortList />
       </main>

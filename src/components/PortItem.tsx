@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Port, KillResponse } from '@/types';
+import { Port } from '@/types';
 import { usePortStore } from '@/store/usePortStore';
 import { Trash2, Loader2, Server, Wifi } from 'lucide-react';
 
@@ -12,30 +12,21 @@ interface PortItemProps {
 export default function PortItem({ port }: PortItemProps) {
   const [isKilling, setIsKilling] = useState(false);
   const [killError, setKillError] = useState<string | null>(null);
-  const { removePort, refreshPorts } = usePortStore();
+  const { killProcess, refreshPorts } = usePortStore();
 
   const handleKillPort = async () => {
     setIsKilling(true);
     setKillError(null);
 
     try {
-      const response = await fetch('/api/kill', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ pid: port.pid, port: port.port }),
-      });
-
-      const data: KillResponse = await response.json();
-
-      if (data.success) {
-        removePort(port.pid);
+      const success = await killProcess(port.pid, port.port);
+      
+      if (success) {
         setTimeout(() => {
           refreshPorts();
         }, 1000);
       } else {
-        setKillError(data.error || 'Failed to kill process');
+        setKillError('Failed to kill process');
       }
     } catch (error) {
       setKillError(error instanceof Error ? error.message : 'Unknown error');
