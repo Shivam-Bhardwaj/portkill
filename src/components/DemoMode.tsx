@@ -5,7 +5,7 @@ import { Play, Square, Info } from 'lucide-react';
 
 interface DemoModeProps {
   isDemo: boolean;
-  onToggleDemo: (enabled: boolean) => void;
+  onToggleDemo: (enabled: boolean) => Promise<void>;
 }
 
 export default function DemoMode({ isDemo, onToggleDemo }: DemoModeProps) {
@@ -23,7 +23,7 @@ export default function DemoMode({ isDemo, onToggleDemo }: DemoModeProps) {
       </div>
 
       <button
-        onClick={() => onToggleDemo(!isDemo)}
+        onClick={async () => await onToggleDemo(!isDemo)}
         className={`flex items-center gap-2 px-3 py-1 rounded text-sm transition-colors ${
           isDemo
             ? 'bg-blue-600 text-white hover:bg-blue-700'

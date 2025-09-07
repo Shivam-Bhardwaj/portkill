@@ -13,7 +13,7 @@ interface PortStore {
   setError: (error: string | null) => void;
   removePort: (pid: string) => void;
   refreshPorts: () => Promise<void>;
-  setDemoMode: (demo: boolean) => void;
+  setDemoMode: (demo: boolean) => Promise<void>;
   killProcess: (pid: string, port: string) => Promise<boolean>;
 }
 
@@ -31,13 +31,28 @@ export const usePortStore = create<PortStore>((set, get) => ({
     ports: state.ports.filter(port => port.pid !== pid)
   })),
   
-  setDemoMode: (demo) => {
-    set({ isDemo: demo, error: null });
+  setDemoMode: async (demo) => {
+    set({ isDemo: demo, error: null, isLoading: demo });
     if (demo) {
-      const demoPorts = getRandomDemoPorts();
-      set({ ports: demoPorts, lastUpdated: new Date() });
+      try {
+        const response = await fetch('/api/demo-ports');
+        if (response.ok) {
+          const data = await response.json();
+          set({ ports: data.ports, lastUpdated: new Date() });
+        } else {
+          // Fallback to static demo data
+          const demoPorts = getRandomDemoPorts();
+          set({ ports: demoPorts, lastUpdated: new Date() });
+        }
+      } catch {
+        // Fallback to static demo data
+        const demoPorts = getRandomDemoPorts();
+        set({ ports: demoPorts, lastUpdated: new Date() });
+      } finally {
+        set({ isLoading: false });
+      }
     } else {
-      set({ ports: [] });
+      set({ ports: [], isLoading: false });
     }
   },
   
@@ -47,10 +62,13 @@ export const usePortStore = create<PortStore>((set, get) => ({
     
     try {
       if (isDemo) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const demoPorts = getRandomDemoPorts();
-        set({ ports: demoPorts, lastUpdated: new Date() });
+        // Use smart demo API that avoids real ports
+        const response = await fetch('/api/demo-ports');
+        if (!response.ok) {
+          throw new Error('Failed to fetch demo ports');
+        }
+        const data = await response.json();
+        set({ ports: data.ports, lastUpdated: new Date() });
       } else {
         const response = await fetch('/api/ports');
         if (!response.ok) {
