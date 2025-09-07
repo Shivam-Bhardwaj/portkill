@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { spawn } from 'child_process';
 
 interface Port {
   pid: string;
@@ -12,11 +9,74 @@ interface Port {
   name: string;
 }
 
+function runNetstat(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('netstat', ['-ano'], {
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    child.stdout?.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    child.stderr?.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve(stdout);
+      } else {
+        reject(new Error(`netstat failed with code ${code}: ${stderr}`));
+      }
+    });
+    
+    child.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
+
+function getProcessName(pid: string): Promise<string> {
+  return new Promise((resolve) => {
+    const child = spawn('tasklist', ['/fi', `pid eq ${pid}`, '/fo', 'csv', '/nh'], {
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    
+    let stdout = '';
+    
+    child.stdout?.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    child.on('close', (code) => {
+      if (code === 0) {
+        const processName = stdout.split(',')[0]?.replace(/"/g, '') || 'Unknown';
+        resolve(processName);
+      } else {
+        resolve('Unknown');
+      }
+    });
+    
+    child.on('error', () => {
+      resolve('Unknown');
+    });
+  });
+}
+
 async function getActivePorts(): Promise<Port[]> {
   try {
-    // Use more comprehensive netstat command to catch all listening ports
-    const { stdout } = await execAsync('netstat -ano');
+    console.log('🔍 Starting port detection...');
+    const stdout = await runNetstat();
+    console.log('✅ Got netstat output, length:', stdout.length);
+    
     const lines = stdout.split('\n').filter(line => line.trim() && line.includes('LISTENING'));
+    console.log('📊 Found', lines.length, 'LISTENING lines');
     
     const ports: Port[] = [];
     const seenPorts = new Set<string>();
@@ -59,15 +119,14 @@ async function getActivePorts(): Promise<Port[]> {
             seenPorts.add(portKey);
             
             try {
-              const { stdout: processInfo } = await execAsync(`tasklist /fi "pid eq ${pid}" /fo csv /nh`);
-              const processName = processInfo.split(',')[0]?.replace(/"/g, '') || 'Unknown';
+              const processInfo = await getProcessName(pid);
               
               ports.push({
                 pid,
                 port: portNum,
                 protocol,
                 status: 'LISTENING',
-                name: processName
+                name: processInfo
               });
             } catch {
               ports.push({
